@@ -1,0 +1,601 @@
+---
+title: "Biostatistics Practice"
+author: "Yucheng Liu"
+date: "October 22, 2023"
+output:
+  html_document:
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+    fig_height: 4.5
+    fig_width: 4.5
+  word_document:
+    toc: no
+  pdf_document:
+    fig_height: 3.5
+    fig_width: 3.5
+---
+
+```{r,echo=FALSE}
+knitr::opts_chunk$set(cache=TRUE, error=FALSE, message=FALSE, warning=FALSE,
+                      echo=T, tidy.opts=list(width.cutoff=60),tidy=TRUE)
+
+```
+
+```{r load packages}
+library(ggplot2)
+library(readxl)
+library(boot)
+library(dplyr)
+library(pwr)
+library(knitr)
+library(stats)
+```
+
+```{r load_data}
+data_hel <- read.csv("/Users/mac/Downloads/Biostatistics 1/hw6/helmet.csv")
+data_pd <- read_excel("/Users/mac/Downloads/Biostatistics 1/hw6/pd.xlsx")
+data8 <- read.csv("/Users/mac/Downloads/Biostatistics 1/hw6/trialData.csv")
+```
+
+## Question 1. Effect of a cholesterol lowering drug
+Patients with high cholesterol values were recruited for a study of a new cholesterol drug. Their cholesterol values were measured at baseline immediately before they started taking the new drug. They had a second cholesterol measurement taken after 6 months of being on the drug. There were 10 patients in the study. The investigators want to analyze the mean change in cholesterol from baseline to 6 months. To estimate the mean change in cholesterol, the investigators subtract the baseline cholesterol value from the six month value. The differences in cholesterol level for the sample are given here: -68, -38, -32, -5, 92, -6, -58, -21, -41, -66.
+
+If the drug does not lower the cholesterol level, we would expect the mean difference to be 0. We will investigate whether there is evidence that the drug is effective at reducing cholesterol over the course of 6 months. We are only interested in whether there is evidence that the difference is less than zero, which means the alternative hypothesis is one-sided. We will use a significance level (one-sided) of 0.025.
+
+
+### Question 1a
+What is the null hypothesis?
+
+#### Solution:
+Answer:
+The null hypothesis (H0) is that the mean difference in cholesterol levels before and after taking the drug is zero.
+
+### Question 1b.
+What is the alternative hypothesis?
+
+#### Solution:
+Answer:
+The alternative hypothesis (H1) is that the mean difference in cholesterol levels before and after taking the drug is less than zero.
+
+### Question 1c.
+Report the value of the test statistic.
+You can get this from using t.test. 
+
+#### Solution:
+```{r}
+# Define the cholesterol differences
+cholesterol_diff <- c(-68, -38, -32, -5, 92, -6, -58, -21, -41, -66)
+
+# Perform a one-sample t-test
+test_result_1a <- t.test(cholesterol_diff, alternative = "less", mu = 0)
+test_result_1a
+
+# Print the test statistic
+test_result_1a$statistic %>% round(3)
+```
+
+### Question 1d.
+Report the p-value.
+
+#### Solution:
+The p-value from the one-sample t-test on the cholesterol differences is 0.06682. This p-value is greater than the significance level of 0.025 that was set for this test. Therefore, we do not have enough evidence to reject the null hypothesis that the mean difference in cholesterol levels is zero. This suggests that the drug may not be effective at lowering cholesterol levels, based on this sample of patients and at this level of significance.
+
+### Question 1e.
+What is your conclusion?
+
+#### Solution:
+Based on the results of the one-sample t-test, we do not have enough evidence to reject the null hypothesis at the 0.025 significance level. The p-value of 0.06682 is greater than the significance level of 0.025. This suggests that the mean difference in cholesterol levels before and after taking the drug is not significantly less than zero.
+
+Therefore, based on this sample of patients and at this level of significance, we cannot conclude that the drug is effective at lowering cholesterol levels over a period of 6 months.
+
+## Question 2. Effect of a cholesterol lowering drug revisited
+An astute colleague reminds you that the t-distribution is only appropriate if the data are approximately normally distributed. For small sample sizes, the only way to really determine this is to examine the data for outliers. Looking at the data, there does appear to be an outlier value (the value of 92). Hence, we are now concerned whether the p-value reported in Question 1 is accurate. We will determine this using a bootstrapped distribution for the test statistic.
+
+Recall that when we used the t-distribution above, we assume that distribution of the standardized sample mean (the t-statistic) had a t-distribution with 9 degrees of freedom. To calculate the t-statistic, we use the formula:
+$$ t = \frac{x - \mu_0}{s/\sqrt{n}} = \frac{x}{s/\sqrt{n}} $$
+Note that in this case the hypothesized value for the mean difference for the null hypothesis is 0, so μ0 = 0.
+
+### Question 2a.
+Generate a boot strap sampling distribution for t using the data in question 1. Use 10,000 bootstrapped samples.
+
+#### Solution:
+```{r}
+# Define the cholesterol differences
+cholesterol_diff <- c(-68, -38, -32, -5, 92, -6, -58, -21, -41, -66)
+
+# Define the number of bootstrap samples
+n_bootstrap <- 10000
+
+# Initialize a vector to store the bootstrap t-statistics
+bootstrap_t <- numeric(n_bootstrap)
+
+# For each bootstrap sample...
+for (i in 1:n_bootstrap) {
+  # Sample with replacement from the cholesterol differences
+  bootstrap_sample <- sample(cholesterol_diff, size = length(cholesterol_diff), replace = TRUE)
+  
+  # Calculate the mean and standard deviation of the bootstrap sample
+  mean_bootstrap <- mean(bootstrap_sample)
+  sd_bootstrap <- sd(bootstrap_sample)
+  
+  # Calculate the t-statistic for the bootstrap sample and store it
+  bootstrap_t[i] <- (mean_bootstrap - 0) / (sd_bootstrap / sqrt(length(bootstrap_sample)))
+}
+
+print(bootstrap_t[1:5]) 
+
+```
+
+
+### Question 2b.
+Plot the density for the bootstrapped sampling distribution for the t-statistic and overlay the density for the t-distribution with 9 degrees of freedom.
+
+#### Solution:
+```{r}
+# Define the cholesterol differences
+cholesterol_diff <- c(-68, -38, -32, -5, 92, -6, -58, -21, -41, -66)
+
+# Define the number of bootstrap samples
+n_bootstrap <- 10000
+
+# Initialize a vector to store the bootstrap t-statistics
+bootstrap_2bt <- numeric(n_bootstrap)
+
+# For each bootstrap sample...
+for (i in 1:n_bootstrap) {
+  # Sample with replacement from the cholesterol differences
+  bootstrap_2bsample <- sample(cholesterol_diff, size = length(cholesterol_diff), replace = TRUE)
+  
+  # Calculate the mean and standard deviation of the bootstrap sample
+  mean_bootstrap_2b <- mean(bootstrap_2bsample)
+  sd_bootstrap_2b <- sd(bootstrap_2bsample)
+  
+  # Calculate the t-statistic for the bootstrap sample and store it
+  bootstrap_2bt[i] <- (mean_bootstrap_2b - 0) / (sd_bootstrap_2b / sqrt(length(bootstrap_2bsample)))
+}
+
+# Create a data frame for plotting
+df <- data.frame(t = bootstrap_2bt)
+
+# Plot the density of the bootstrap t-statistics
+p <- ggplot(df, aes(t)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  stat_function(fun = dt, args = list(df = length(cholesterol_diff) - 1), 
+                color = "red", size = 1.5) +
+  theme_minimal() +
+  labs(x = "t-statistic", y = "Density", 
+       title = "Density of Bootstrap t-statistics and t-distribution")
+
+# Print the plot
+print(p)
+
+```
+
+### Question 2c.
+Based on the plot in question 2b, Does it appear as though a t-distribution is a good approximation for the sampling distribution for the data in question 1? Explain.
+
+#### Solution:
+Answer:
+Based on the plot, it appears that the t-distribution (represented by the red curve) does not perfectly align with the bootstrap sampling distribution (represented by the blue curve) for the t-statistic. The bootstrap sampling distribution seems to have a slightly different shape and is shifted to the left compared to the t-distribution. This suggests that the t-distribution may not be a good approximation for the sampling distribution in this case.
+
+### Question 2d.
+Make a qq-plot for the bootstrap sampling distribution and a t-distribution with df = 9. Add the qq-line as well as the line of identity.
+
+#### Solution:
+```{r}
+# Define the cholesterol differences
+cholesterol_diff <- c(-68, -38, -32, -5, 92, -6, -58, -21, -41, -66)
+
+# Define the number of bootstrap samples
+n_bootstrap <- 10000
+
+# Initialize a vector to store the bootstrap t-statistics
+bootstrap_t <- numeric(n_bootstrap)
+
+# For each bootstrap sample
+for (i in 1:n_bootstrap) {
+  # Sample with replacement from the cholesterol differences
+  bootstrap_sample_2d <- sample(cholesterol_diff, size = length(cholesterol_diff), replace = TRUE)
+  
+  # Calculate the mean and standard deviation of the bootstrap sample
+  mean_bootstrap_2d <- mean(bootstrap_sample_2d)
+  sd_bootstrap_2d <- sd(bootstrap_sample_2d)
+  
+  # Calculate the t-statistic for the bootstrap sample and store it
+  bootstrap_t[i] <- (mean_bootstrap_2d - 0) / (sd_bootstrap_2d / sqrt(length(bootstrap_sample_2d)))
+}
+
+# Create a QQ-plot
+ggplot() +
+  geom_qq(data = data.frame(resids = bootstrap_t), aes(sample = resids)) +
+  geom_qq_line(data = data.frame(resids = bootstrap_t), aes(sample = resids), color = "blue") +
+  geom_abline(intercept = 0, slope = 1, color = "red") +
+  labs(x = "Theoretical Quantiles", y = "Sample Quantiles", 
+       title = "QQ-Plot of Bootstrap t-statistics and t-distribution") +
+  theme_minimal()
+```
+
+### Question 2e.
+Based on the plot in question 2d, does it appear as though a t-distribution is a good approximation for the sampling distribution for the data in question 1? Explain.
+
+#### Solution:
+Based on the QQ-plot, the points do not perfectly align along the line of identity, which suggests that the t-distribution may not be a perfect approximation for the bootstrap sampling distribution of the t-statistic. However, the points do seem to follow a general linear trend, indicating that the t-distribution might still be a reasonable approximation for the sampling distribution. 
+
+### Question 2f.
+Use the bootstrap BCa approach implemented in boot.ci function to calculate and report the one-sided 97.5% confidence interval for the population mean.
+
+Note that we can only used bootstrap samples to generate the confidence interval here. The confidence interval that would correspond to a one sided test of significance using a significance level of 0.025 would be one that has 97.5% of the values less than an upper bound. When using boot.ci you would use a significance level of 0.95 and only use the upper bound: i.e. the confidence interval is from −∞ to the upper bound. If you take it directly from the sampling distribution of the t-statistic that you generated, you would use the 0.975 quantile. Be sure to explicitly set the random seed when generating the bootstrap samples so that your results can be replicated.
+
+#### Solution:
+```{r}
+# Define the cholesterol differences
+cholesterol_diff <- c(-68, -38, -32, -5, 92, -6, -58, -21, -41, -66)
+
+# Define the number of bootstrap samples
+n_bootstrap <- 10000
+
+# Set a random seed for reproducibility
+set.seed(1)
+
+# Define a function to calculate the mean
+mean_fun <- function(data, indices) {
+  return(mean(data[indices]))
+}
+
+# Generate bootstrap samples and calculate the mean for each sample
+bootstrap_results <- boot(data = cholesterol_diff, statistic = mean_fun, R = n_bootstrap)
+
+# Calculate the one-sided 97.5% confidence interval using the BCa method
+ci_results <- boot.ci(bootstrap_results, type = "bca", conf = 0.95, index = 1)
+
+# Print the upper bound of the confidence interval
+print(ci_results$bca[5])
+
+```
+
+### Question 2g.
+Based on the confidence interval in 2f, is there evidence at the 0.025 level of significance that the drug significantly lowers the cholesterol levels?
+
+#### Solution:
+Answer: 
+Based on the bootstrap BCa confidence interval calculations, the 95% confidence interval for the mean difference in cholesterol levels is (-44.00, 16.01). This means that we are 95% confident that the true mean difference in cholesterol levels lies within this interval.
+
+## Question 3. Use of bicycle helmets and head injury
+A study was conducted to investigate the effectiveness of bicycle safety helmets in preventing head injury. The data consist of a random sample of 793 people involved in bicycle accidents during a one year period. The data are in helmet.csv.
+
+We are interested in whether the proportions of individuals with a head injury differs between the group of people who wore a helmet and those who did not.
+
+### Question 3a.
+Give the point estimate for the difference in the proportion of individuals who suffered a head injury between the group who did not wear a helmet and those who did wear a helmet.
+
+Perform the subtraction this way: proportion with a head injury for those who did not wear a helmet - proportion with a head injury for those who did wear a helmet.
+
+#### Solution:
+```{r}
+# Calculate proportions
+helmet_worn <- filter(data_hel, helmet == "yes")
+helmet_not_worn <- filter(data_hel, helmet == "no")
+
+# Calculate the proportion of head injuries for each group
+prop_head_injury_helmet_worn <- sum(helmet_worn$headInjury == "yes") / nrow(helmet_worn)
+prop_head_injury_helmet_not_worn <- sum(helmet_not_worn$headInjury == "yes") / nrow(helmet_not_worn)
+
+# Calculate the difference
+difference <- round(prop_head_injury_helmet_not_worn - prop_head_injury_helmet_worn, 3)
+cat("The estimated difference is", difference)
+```
+
+### Question 3b.
+Give the 99% confidence interval for the difference in proportions computed in 3a.
+
+#### Solution:
+```{r}
+# Calculate the sample sizes
+n_helmet_worn <- nrow(helmet_worn)
+n_helmet_not_worn <- nrow(helmet_not_worn)
+
+# Calculate the proportions again
+p1 <- sum(helmet_not_worn$headInjury == "yes") / n_helmet_not_worn
+p2 <- sum(helmet_worn$headInjury == "yes") / n_helmet_worn
+
+# Calculate the standard error
+SE <- sqrt((p1 * (1 - p1) / n_helmet_not_worn) + (p2 * (1 - p2) / n_helmet_worn))
+
+# Calculate the confidence interval
+z <- qnorm(0.995) # for a 99% CI
+CI_lower <- round(difference - z * SE, 3)
+CI_upper <- round(difference + z * SE, 3)
+
+cat("The 99% confidence interval for the difference is (", CI_lower, ", ", CI_upper, ")")
+
+```
+
+### Question 3c.
+Based on your answers to 3a and 3b, what is your conclusion regarding bicycle helmets and the proportion of individuals who suffer head injuries.
+
+#### Solution:
+Answer:
+Based on the results from 3a and 3b, the point estimate of the difference in proportions of individuals who suffered a head injury between those who did not wear a helmet and those who did is **0.221815**. The 99% confidence interval for this difference is **(0.1386740, 0.3049561)**.
+
+Since the confidence interval does not contain zero, we can conclude that there is a statistically significant difference in the proportions of individuals who suffer head injuries between those who wear helmets and those who do not. Specifically, the proportion of individuals who suffer head injuries is significantly higher among those who do not wear helmets compared to those who do.This suggests that wearing a helmet may be effective in reducing the risk of head injury in bicycle accidents. 
+
+## Question 4.Critical values and rejection regions
+Suppose we want to perform a test of significance to compare the proportions of individuals with head injuries between the group that wears a helmet and those who do not (data in question 3). Before we perform the test, we want to set up the critical values and rejection region before actually computing the test statistic from the data. We will perform a two-tailed test of significance using a level of significance of 0.01.
+
+Values of interest:
+• sample size with helmets: 147
+• sample size without helmets: 646
+• the pooled proportion of individuals with a head injury across the two groups: 0.30
+
+Recall if we standardize the difference between the sample proportions (where we subtract the mean and divide by the standard deviation of the sampling distribution), this statistic (call it a z-statistic), has a standard normal distribution.
+
+### Question 4a.
+What is the value of the difference in population proportions for the null hypothesis?
+
+#### Solution:
+Answer:
+In a hypothesis test comparing two proportions, the null hypothesis is that the two population proportions are equal. Therefore, the value of the difference in population proportions under the null hypothesis is 0. This is because we assume there is no difference between the two proportions under the null hypothesis.
+
+
+### Question 4b.
+What are the two critical values for the z-statistic.
+
+#### Solution:
+```{r}
+# Calculate critical values
+critical_value_lower <- round(qnorm(0.005), 3) # Lower 
+critical_value_upper <- round(qnorm(1 - 0.005), 3) # Upper 
+
+cat("The lower critical value is", critical_value_lower, "and the upper critical value is", critical_value_upper)
+```
+
+### Question 4c.
+What is the rejection region for this study?
+
+#### Solution:
+Answer:
+The rejection region is the set of values of the z-statistic for which we would reject the null hypothesis.
+
+Given that the lower critical value is -2.575829 and the upper critical value is 2.575829, the rejection region for this two-tailed test is:
+
+The set of z-scores less than -2.575829
+The set of z-scores greater than 2.575829
+
+### Question 4d.
+Compute the value of the z-statistic for the data in question 3.
+
+#### Solution:
+```{r}
+# Given values
+n_helmet_worn <- 147 
+n_helmet_not_worn <- 646 
+pooled_prop <- 0.30 
+difference <- 0.221815 # difference in sample proportions from 3a
+
+# Calculate the z-statistic
+z_statistic <- round(difference / sqrt(pooled_prop * (1 - pooled_prop) * ((1 / n_helmet_not_worn) + (1 / n_helmet_worn))), 3)
+
+cat("The z-statistic for the data in question 3 is", z_statistic)
+```
+
+### Question 4e.
+Using the value of the z-statistic you computed in 4d and the rejection regions in 4c, what is your conclusion for the test of significance? (Use complete sentences.)
+
+#### Solution:
+Answer:
+The calculated z-statistic is **5.297**, which falls within the rejection region (less than -2.575829 or greater than 2.575829), we reject the null hypothesis at the 0.01 level of significance.
+
+This suggests that there is a statistically significant difference in the proportions of individuals with head injuries between those who wear helmets and those who do not. In other words, the use of helmets appears to have a significant effect on the proportion of individuals who suffer head injuries in bicycle accidents.
+
+## Question 5.Response to pain medication study design
+Determine a sample size
+
+A study team at Hospital for Special Surgery is interested in performing a clinical trial to evaluate the effectiveness of a newly developed pain reliever designed to reduce pain after joint replacement surgery. Patients will be randomized equally between the new pain reliever and the standard pain reliever. The patient and the person administering the drug and performing the pain evaluations will be blinded as to what drug is given to the patient. The pain level of each participant will be evaluated immediately prior to administering the randomly assigned pain reliever to the patient; this is the baseline value. Each patient will indicate her/his pain level on a scale of 0 to 10, where 0 is no pain, and 10 is the worst pain imaginable. Thirty minutes after receiving the pain reliever, the patient will again be asked to indicate her/his pain level on a scale of 0 to 10. If the pain level is lower at 30 minutes compared to baseline, this will be deemed a response. The study team wants to know how many patients they need in their trial.
+
+Some of the information they provide is the following:
+• the sample size of the two treatment groups will be equal
+• the response rate at 30 minutes after delivering the control pain reliever is 0.35
+• the study team is interested in being able to detect a minimum response rate at 30 minutes for the new pain reliever of 0.50
+• the investigators will be doing a two-sided test with α = 0.05
+
+What is the sample size needed (total sample size for the trial) if the investigators want to achieve 90% power?
+
+#### Solution:
+```{r}
+# Parameters
+p1 <- 0.35  
+p2 <- 0.50  
+sig.level <- 0.05  
+power <- 0.90 
+
+# Calculate sample size
+result <- power.prop.test(p1 = p1, p2 = p2, sig.level = sig.level, power = power, alternative = "two.sided")
+
+# Print the result
+cat("To achieve a power of", power, "for detecting a minimum response rate of", p2, "with a significance level of", sig.level, ", a total sample size of", ceiling(result$n), "is needed for the trial.")
+
+```
+
+## Question 6. Phenformin and cardiovascular mortality
+In a trial of diabetic therapy, patients were either treated with phenformin or a placebo. The numbers of patients and deaths from cardiovascular (CV) causes are in the following table.
+
+```{r}
+# Data
+table6 <- data.frame(
+  Result = c("CV death", "not a CV death", "Total"),
+  phenformin = c(26, 178, 204),
+  placebo = c(2, 62, 64),
+  Total = c(28, 240, 268)
+)
+table6
+```
+
+Use a Fisher’s exact test to investigate the difference in CV morality between the two treatment groups. Use a 0.01 level of significance.
+
+### Question 6a.
+What is the null hypothesis?
+
+#### Solution:
+Answer:
+Null hypothesis(H0): there is no association between the treatment groups (phenformin and placebo) and the outcomes (CV death and not a CV death).
+
+### Question 6b.
+What is the alternative hypothesis?
+
+#### Solution:
+Answer:
+Alternative hypothesis(Ha): there is an association between the treatment groups (phenformin and placebo) and the outcomes(CV death and not a CV death).
+
+### Question 6c.
+What is the p-value?
+
+#### Solution:
+```{r}
+data_6c <- matrix(c(26, 178, 2, 62), nrow = 2)
+
+# Fisher's Exact Test
+result <- fisher.test(data_6c)
+
+# Print the p-value with descriptive text
+cat("The p-value for the Fisher's exact test is", result$p.value %>% round(3)) 
+```
+
+### Question 6d.
+What is your conclusion?
+
+#### Solution:
+Answer:
+The p-value for the Fisher's exact test is 0.03, which is greater than the significance level of 0.01, we fail to reject the null hypothesis. This means that, at a 0.01 level of significance, we do not have enough evidence to conclude that there is a difference in cardiovascular mortality between the phenformin and placebo groups. 
+
+## Question 7. Surgical apgar score and 30-day perioperative morbidity/mortality of pancreaticodudenectomy
+Pancreaticodudenectomy (PD) is a procedure that is associated with considerable morbidity. A study was recently conducted in 589 patients who had a successful PD between January 2009 and December 2019 to determine whether their Surgical Apgar Score (SAS) is related to 30-day perioperative morbidity and mortality. The data are in pd.xlsx. The variables are SAS which has the SAS in three ranges (higher the number the healthier the patient) and morbidity. The morbidity variable has three levels: none, which corresponds to no perioperative morbidity; minor, which corresponds to minor perioperative morbidity; and major, which corresponds to major perioperative morbidity or death.
+
+### Question 7a.
+What is the null hypothesis?
+
+#### Solution:
+Answer:
+Null hypothesis(H0): there is no association between the Surgical Apgar Score (SAS) and 30-day perioperative morbidity and mortality.
+
+### Question 7b.
+What is the alternative hypothesis?
+
+#### Solution:
+Answer:
+Alternative hypothesis(Ha): there is an association between the Surgical Apgar Score (SAS) and 30-day perioperative morbidity and mortality. 
+
+### Question 7c.
+What is the value of the chi-square statistic?
+
+#### Solution:
+```{r}
+# Chi-Square Test
+result <- chisq.test(table(data_pd$SAS, data_pd$morbidity))
+
+# Print the chi-square statistic with descriptive text
+cat("The chi-square statistic is ", result$statistic %>% round(3))
+```
+
+### Question 7d.
+What is the p-value and what distribution was used to obtain it?
+
+#### Solution:
+```{r}
+# Chi-Square Test
+result <- chisq.test(table(data_pd$SAS, data_pd$morbidity))
+
+# Print the p-value and distribution with descriptive text
+cat("The p-value for the chi-square test is", result$p.value, "and the test statistic follows a chi-square distribution.")
+```
+
+### Question 7e.
+Is a chi-square test appropriate for this data? Explain.
+
+#### Solution:
+Answer:
+The chi-square test is appropriate for this data because:
+
+1. **Independence**: The observations are independent of each other.
+
+2. **Sample Size**: The data set has 2 rows and 589 columns which can satisfie the needs of chi-square.
+
+### Question 7f.
+Generate a mosaic plot that shows the association between the patient SAS and peri-operative morbidity outcome.
+
+#### Solution:
+```{r}
+# Create Mosaic Plot
+mosaicplot(table(data_pd$SAS, data_pd$morbidity), main="Mosaic Plot of SAS and Morbidity", xlab="SAS", ylab="Morbidity", color=TRUE)
+```
+
+### Question 7g.
+What is your conclusion?
+
+#### Solution:
+Answer:
+The p-value for the chi-square test is **0.0004148419**, which is less than the common significance level of **0.05**, we reject the null hypothesis. This suggests that there is a statistically significant association between the Surgical Apgar Score (SAS) and 30-day perioperative morbidity and mortality.
+
+The chi-square statistic of **20.40775** further supports this conclusion, as a larger chi-square statistic indicates a greater divergence from the null hypothesis.
+
+The mosaic plot visually represents this association, with different levels of SAS and morbidity outcomes showing varying proportions.
+
+## Question 8. Phenformin and cardiovascular death data analysis revisited
+For the data in Question 6, we used a Fisher’s exact test because the sample size was too small to meet the assumptions of a sampling distribution for either a difference in the proportions (which would be normal) or a chi-square distribution.
+
+We could have generated an approximate sampling distribution another way using what is called a randomization test. The null hypothesis is that the two population proportions are the same. If this is the case, then the groups to which the patients were randomized should not matter. So we can generate the sampling distribution for the difference in the proportion of patients who experience a CV death by randomly assigning each of the patients to the treatment and placebo groups and determining the difference in the proportion of patients who experience a CV death between the two groups. The data are in a file called trialData.csv. There are two variables: treatment, which indicates whether a patient is in the phenformin or placebo group, and CVdeath, which is equal to 1 if a patient experienced a CV death. Since the CVdeath variable is coded this way, we can get the proportion of patients who experience a CV death by taking the mean of CVdeath.
+
+### Question 8a.
+Generate a sampling distribution based on 7500 randomization for the difference in the proportion of patients in each group who experience a CV death assuming that there is no difference (i.e. assuming the null hypothesis is true) by randomly assigning patients to groups each time. Make a histogram of the approximate sampling distribution.
+
+#### Solution:
+```{r}
+# Observed Difference
+oDiff <- mean(data8[data8$treatment=="phenformin",2]) - mean(data8[data8$treatment=="placebo",2])
+
+# Initialize a vector to store the differences
+diffs <- numeric(7500)
+
+# Generate Sampling Distribution
+set.seed(1039)  # for reproducibility
+for (i in 1:7500) {
+  # Randomly assign treatments
+  data8$treatment <- sample(data8$treatment)
+  
+  # Calculate the difference in proportions
+  diffs[i] <- mean(data8[data8$treatment=="phenformin",2]) - mean(data8[data8$treatment=="placebo",2])
+}
+
+# Create Histogram
+ggplot() +
+  geom_histogram(aes(diffs), bins=30, fill="dodgerblue", alpha=0.7) +
+  geom_vline(aes(xintercept=oDiff), color="red", linetype="dashed") +
+  theme_minimal() +
+  labs(x="Difference in Proportions", y="Frequency",
+       title="Approximate Sampling Distribution of Difference in Proportions",
+       subtitle=paste("Observed Difference:", round(oDiff, 3)))
+```
+
+### Question 8b.
+What is the p-value? To get a p-value for the test of significance, we can determine how many times we got a value as or more extreme than the one we observed in our data using the approximate sampling distribution we got in 8a, when we assumed the null hypothesis was true.
+
+#### Solution:
+```{r}
+# Calculate p-value
+p_value <- round(mean(abs(diffs) >= abs(oDiff)), 3)
+
+# Print the p-value 
+cat("The p-value for the randomization test is", p_value)
+```
+
+### Question 8c.
+How does this p-value compare to the one in question 6c?
+
+#### Solution:
+Answer:
+The p-value from the randomization test (0.3436) is much larger than the p-value from the Fisher's exact test (0.0004148419) that we calculated in question 6c.
+
+A p-value is a measure of the strength of evidence against the null hypothesis. A smaller p-value indicates stronger evidence against the null hypothesis, while a larger p-value indicates weaker evidence.
+
+In this case, the Fisher's exact test provided strong evidence against the null hypothesis (p < 0.01), suggesting a significant difference in cardiovascular mortality between the phenformin and placebo groups. However, the randomization test provided weak evidence against the null hypothesis (p > 0.05), suggesting that we fail to reject the null hypothesis of no difference in cardiovascular mortality between the groups.
+

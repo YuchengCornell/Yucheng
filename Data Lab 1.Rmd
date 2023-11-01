@@ -1,0 +1,169 @@
+---
+title: "Lab #1: Using dplyr and ggplot2 to recreate a plot"
+date: "02/10/2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Loading Libraries  
+
+```{r, message = FALSE}
+install.packages("ggpubr")
+library(ggpubr)
+library(tidyverse)
+library(medicaldata)
+```
+
+## Plot A  
+
+Make a stacked bar plot of the test results by day  
+Change the colors using the following hex code colors: #1f77b4, #e377c2 and #2ca02c  
+Change the labels on the x-axis, y-axis, title, and legend  
+Use theme_minimal() to remove the gray background  
+Use theme() to center the title  
+Use geom_segment() and annotate() to draw the arrow and write text on the plot  
+
+```{r}
+covid <- covid_testing %>%
+  select(pan_day, result) %>%
+  mutate(result = str_to_title(result)) # Making custom data set to plot in A
+
+# This is part A of the submission
+
+plot_a <- covid %>%
+  ggplot(aes(x = pan_day,
+             fill = result)) +
+  geom_bar() +    # Bar plot
+  theme_minimal() +
+  scale_fill_manual(values = c("Positive" = "#2ca02c",
+                               "Negative" = "#e377c2",
+                               "Invalid" = "#1f77b4")) +    # Custom colors
+  labs(x = "Pandemic Day",     # Labeling
+       y = "Total Number of Tests",
+       title = "COVID-19 Test Results at CHOP: \n First 107 Days of the Pandemic") +
+  theme(plot.title = element_text(hjust = 0.5,
+                                  size = 15),
+        axis.title.x = element_text(size = 10),
+        axis.title.y = element_text(size = 10)) +
+  guides(fill = guide_legend(title = "Test Result")) +    # Legend renaming
+  geom_segment(aes(x = 68,   # Arrow
+                   y = 230,
+                   xend = 78.8,
+                   yend = 20),
+               linewidth = 1,
+               arrow = arrow(type = "open", length = unit(0.5, "cm"))) +
+  annotate("text", x = 65, y = 230 + 40,
+           label = "Highest Number of \n Positive Tests (20) \n on Day 79",
+           size = 3)        # Annotation
+```
+
+## Plot B  
+
+Use the covid_summary dataframe  
+Make a bar plot and change the colors of your bar plot  
+Using scale_y_continuous() change the y-axis labels to percents  
+Change the labels on the x-axis, y-axis, and title  
+Use theme_minimal() to remove the gray background  
+Use theme() to center the title and remove the legend
+
+```{r}
+# This is part B of the submission
+
+# Filter the data for COVID tests
+covid_summary <- covid_testing %>%
+  filter(test_id == "covid") %>%
+  # Convert the result to title case for consistency
+  mutate(result = stringr::str_to_title(result))
+
+# Group the data by pandemic day and calculate the positive rate
+covid_summary <- covid_summary %>%
+  group_by(pan_day) %>%
+  summarise(positive_rate = sum(result == "Positive") / n()) # Calculate the positive rate
+
+# Create a bar plot of positive rate by pandemic day
+plot_b <- ggplot(covid_summary, aes(x = pan_day, y = positive_rate)) +
+  # Use identity stat for bars to represent actual values
+  geom_bar(stat = "identity", fill = "#2ca02c") +
+  # Scale y-axis to percent format
+  scale_y_continuous(labels = scales::percent) +
+  # Add labels for axes and title
+  labs(x = "Pandemic Day", y = "Percent Positive tests", title = "Percent of Positive \n Test Results by Day", lwd = 2) +
+  # Use a minimal theme for a clean look
+  theme_minimal() +
+  # Center the title and adjust its size
+  theme(plot.title = element_text(hjust = 0.5, size = 11), 
+        # Remove the legend as it's not necessary for this plot
+        legend.position = "none",
+        # Adjust the size of axis titles
+        axis.title.x = element_text(size = 11),           
+        axis.title.y = element_text(size = 11))
+
+```
+
+## Plot C  
+Use the covid_ages dataframe  
+Make a bar plot and change the colors of your bar plot  
+Use theme_minimal() to remove the gray background  
+Use theme() to center the title, remove the legend, and rotate the x-axis labels
+
+```{r}
+# This is part C of the submission
+
+## Read in the covid testing data
+covid <- medicaldata::covid_testing
+## Filter the data for COVID tests and start with capital letters
+covid_test <- filter(covid, test_id == "covid") %>%
+  mutate(result = stringr::str_to_title(result))
+## Calculates the percent of positive tests per day 
+covid_summary <- group_by(covid_test, pan_day) %>%
+summarise(total = sum(result == "Positive"))
+
+covid_ages <- covid_test %>%
+## Filter for only positive test results
+  filter(result == "Positive") %>%
+## create a variable for age categories
+  mutate(age_categories = cut(age, breaks = c(-Inf, 10, 20, 30, 40, 50, 60, Inf), 
+                              labels = c("0-10", "11-20", "21-30", "31-40", "41-50", "51-60", "61+")))
+
+## Initialize ggplot object
+plot_c <- ggplot(covid_ages, 
+       aes(age_categories)) +
+## Bar plot in green
+  geom_bar(fill = "#2ca02c") +
+## Relabel x and y axis
+  labs(x = "Age", y = "Number of Positive Tests", 
+## Add a title
+       title = "Positive Test by Age Group") +
+## Remove the gray background
+  theme_minimal() +
+## Adjust text size and title position
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.title.x = element_text(size = 15),           
+        axis.title.y = element_text(size = 15),            
+        legend.position = "none")
+```
+
+## Putting the plots together  
+Use ggpubr::ggarrange to arrange the plots  
+Label the plots “A”, “B”, and “C”  
+Create a common legend and put this at the bottom of the plot
+
+```{r}
+
+# Putting everything together and final output
+
+## First row with plot a
+ggarrange(plot_a,               
+## Second row with plot b and c
+  ggarrange(plot_b, plot_c, ncol = 2, 
+## Relabel plot b and c
+            labels = c("B", "C")),
+            nrow = 2, 
+## Relabel plot a
+  labels = "A" ,
+## Add a common legend at the bottom
+  common.legend = TRUE, legend = "bottom")
+```

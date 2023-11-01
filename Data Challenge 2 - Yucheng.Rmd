@@ -1,0 +1,183 @@
+---
+title: "Data  Challenge 2 - Yucheng Liu"
+output: html_document
+date: "2023-09-30"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load packages}
+library(tidyverse)
+library(ggplot2)
+library(readxl)
+library(lubridate)
+library(janitor)
+library(dplyr)
+library(tidyr)
+library(stringr)
+```
+
+## Problem 1
+We will be working with data from Mr. Trash Wheel, a water wheel trash collection device that removed trash from the Inner Harbor in Baltimore, Maryland. There are three trash wheels we will be exploring (Mr. Trash Wheel, Professor Trash Wheel, and Captain Trash Wheel). I have provided you the data for this on Canvas in the Excel spreadsheet titled Trash-Wheel-Collection-Totals-8-6-19.xlsx.
+
+### Solution 1
+```{r}
+# Read in the data for each trash wheel
+mr_trash_wheel_data <- readxl::read_excel("/Users/mac/Downloads/Data Science 1/Git/YLassign/Trash-Wheel-Collection-Totals-8-6-19.xlsx", sheet = "Mr. Trash Wheel")
+
+professor_trash_wheel_data <- readxl::read_excel("/Users/mac/Downloads/Data Science 1/Git/YLassign/Trash-Wheel-Collection-Totals-8-6-19.xlsx", sheet = "Professor Trash Wheel")
+
+captain_trash_wheel_data <- readxl::read_excel("/Users/mac/Downloads/Data Science 1/Git/YLassign/Trash-Wheel-Collection-Totals-8-6-19.xlsx", sheet = "Captain Trash Wheel")
+
+# Clean column names and omit rows without dumpster-specific data for Mr. Trash Wheel
+mr_trash_wheel_data <- mr_trash_wheel_data %>%
+  janitor::clean_names() %>%
+  filter(!is.na(dumpster)) 
+
+mr_trash_wheel_data$wheel <- "Mr. Trash Wheel"
+
+mr_trash_wheel_data <- mr_trash_wheel_data %>%
+  pivot_longer(cols = c("plastic_bottles", "polystyrene", "cigarette_butts", "glass_bottles", "grocery_bags", "chip_bags", "sports_balls"), 
+               names_to = "trash_type",
+               values_to = "number_of_trash_items")
+
+# Clean column names and omit rows without dumpster-specific data for Professor Trash Wheel
+professor_trash_wheel_data <- professor_trash_wheel_data %>%
+  janitor::clean_names() %>%
+  filter(!is.na(dumpster)) 
+
+professor_trash_wheel_data$wheel <- "Professor Trash Wheel"
+
+professor_trash_wheel_data <- professor_trash_wheel_data %>%
+  pivot_longer(cols = c("plastic_bottles", "polystyrene", "cigarette_butts", "glass_bottles", "grocery_bags", "chip_bags", "sports_balls"), 
+               names_to = "trash_type",
+               values_to = "number_of_trash_items")
+
+# Clean column names and omit rows without dumpster-specific data for Captain Trash Wheel
+captain_trash_wheel_data <- captain_trash_wheel_data %>%
+  janitor::clean_names() %>%
+  filter(!is.na(dumpster)) 
+
+captain_trash_wheel_data$wheel <- "Captain Trash Wheel"
+
+captain_trash_wheel_data <- captain_trash_wheel_data %>%
+  pivot_longer(cols = c("plastic_bottles", "polystyrene", "cigarette_butts", "plastic_bags"), 
+               names_to = "trash_type",
+               values_to = "number_of_trash_items")
+
+# Combine data from all three trash wheels
+all_trash_wheels <- dplyr::bind_rows(mr_trash_wheel_data, professor_trash_wheel_data, captain_trash_wheel_data)
+
+# Create a new dataframe for June 2018 totals
+all_trash_wheels_totals_June_2018 <- all_trash_wheels %>%
+  filter(month == "June", year == 2018) %>%
+  group_by(wheel, trash_type) %>%
+  summarise(total_trash_collected = sum(number_of_trash_items), .groups = 'drop')
+
+# Make the plot
+ggplot(all_trash_wheels_totals_June_2018, aes(x = total_trash_collected, y = wheel, fill = wheel)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Trash Collected by Trash Wheel (June 2018)",
+       x = "Total Trash Collected",
+       y = "Trash Wheel") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  facet_wrap(~trash_type, scales = "free", ncol = 2) +
+  scale_fill_manual(values = c("Mr. Trash Wheel" = "lightblue", "Professor Trash Wheel" = "blue", "Captain Trash Wheel" = "lightgreen"))
+
+```
+
+## Problem 2
+Next we will be examining data from FiveThirtyEight on the S&P closing prices and the unemployment rate. For this problem, the data is provided on Canvas. You will need snp.csv and unemployment.csv.
+
+### Solution 2
+```{r}
+# Read the data
+snp_data <- read_csv("/Users/mac/Downloads/Data Science 1/Data Challenge 2/data/snp.csv")
+unemployment_data <- read_csv("/Users/mac/Downloads/Data Science 1/Data Challenge 2/data/unemployment.csv")
+
+snp_data$date <- mdy(snp_data$date)
+
+# Correct dates from the S&P data
+snp_data$date[snp_data$date > as.Date("2068-01-01")] <- date(snp_data$date[snp_data$date > as.Date("2068-01-01")] - years(100))
+
+snp_data$year <- year(snp_data$date)
+snp_data$month <- month(snp_data$date)
+
+# Convert the unemployment data from wide to long format, making each month a row instead of a column
+unemployment_data_long <- gather(unemployment_data, key = "month", value = "unemployment_rate", -Year)
+
+# Convert month names to corresponding month numbers (e.g., Jan to 1)
+unemployment_data_long$month_num <- match(unemployment_data_long$month, month.name)
+
+# Create a new date column in the unemployment data using the month and year columns
+unemployment_data_long$date <- mdy(paste(unemployment_data_long$month_num, "1", unemployment_data_long$Year))
+
+# Merge the S&P data and unemployment data
+merged_data <- merge(snp_data, unemployment_data_long, by = "date", all.x = TRUE)
+
+# Remove rows from the merged data where the unemployment rate is NA
+merged_data <- merged_data[!is.na(merged_data$unemployment_rate), ]
+
+merged_data$unemployment_rate[is.na(merged_data$unemployment_rate)] <- mean(merged_data$unemployment_rate, na.rm = TRUE)
+
+# Determine a scale factor to scale the unemployment rate 
+scale_factor <- max(merged_data$close) / max(merged_data$unemployment_rate)
+
+# Plot both the S&P close prices and the scaled unemployment rate on the same plot
+ggplot(merged_data, aes(x = date)) +
+  geom_line(aes(y = close), color = "navyblue") +  
+  geom_line(aes(y = unemployment_rate*scale_factor), color = "lightblue") +  
+  scale_y_continuous(sec.axis = sec_axis(~./scale_factor, name = "Unemployment Rate")) +  
+  labs(title = "S&P Average and Unemployment Rate Over Time", 
+       y = "S&P Close Price") +
+  theme_minimal()  
+
+```
+
+## Problem 3
+Next we will examine the direct relationship between the S&P closing prices and the unemployment rate using data from 2000 and onward in a scatterplot.
+
+### Solution 3
+```{r}
+# snp_average Data Preparation
+snp_average <- snp_data %>%
+  group_by(year, month) %>%
+  summarise(mean_close = mean(close, na.rm = TRUE), .groups = "drop") %>%
+  mutate(date = mdy(paste(month, "1", year)))
+
+# Convert month in the unemployment_data_long back to numeric
+unemployment_data_long$month <- as.numeric(unemployment_data_long$month_num)
+
+# Data Merging
+merged_data_2000_onwards <- left_join(snp_average, unemployment_data_long, by = c("year", "month")) %>%
+  filter(year >= 2000)
+
+# Double-check that there are rows in the merged dataset
+if(nrow(merged_data_2000_onwards) == 0) {
+  print("The merged dataset is empty.")
+  return()
+}
+
+plot_result <- ggplot(merged_data_2000_onwards, aes(x = unemployment_rate, y = mean_close)) +
+  geom_point(aes(color = as.factor(year), size = 5, alpha = 0.7)) +
+  scale_color_brewer(palette = "Set3") +
+  labs(title = "Monthly Average S&P Closing Price vs. Unemployment Rate (2000 onwards)",
+       x = "Unemployment Rate",
+       y = "Monthly Average S&P Closing Price",
+       color = "Year") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+print(plot_result)
+
+
+```
+
+## Problem 4
+Write a paragraph (at least 5 sentences) describing what you observed in the plots in Problems 2 & 3.
+
+### Solution 4
+The plots in Problems 2 and 3 provide a visual representation of the relationship between the S&P closing prices and the unemployment rate over time. In Problem 2, the line graph shows that the S&P Average has generally increased over time, indicating a positive trend in the stock market. However, there are noticeable dips which could be associated with economic downturns. The Unemployment Rate, represented by a gray line, fluctuates over time and does not show a clear trend. In Problem 3, the scatter plot visualizes the direct relationship between the S&P closing prices and the unemployment rate from 2000 onward. Each point represents a month and is colored based on the year. The plot suggests that there might be a correlation between these two variables, but further statistical analysis would be needed to confirm this.

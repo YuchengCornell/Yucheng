@@ -1,0 +1,74 @@
+---
+title: "Lab2"
+output: html_document
+date: "2023-10-23"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, 
+                      warning=FALSE, 
+                      message=FALSE)
+```
+
+```{r}
+library(readr) 
+library(ggplot2)
+library(rlang)
+
+## read in the data 
+df <- read_csv('DRG/DRG_data.csv')
+```
+
+```{r}
+ggplot_boxplot_payments <- function(df, payment_type, color = "red") {
+  # Check if payment_type is valid
+  if(!(payment_type %in% c("Average Medicare Payments", 
+                           "Average Total Payments", 
+                           "Average Covered Charges"))){
+    stop("Invalid payment_type. Choose from 'Average Medicare Payments', 
+         'Average Total Payments', 'Average Covered Charges'")
+  }
+  
+  # Check if DRG Definition and payment_type columns exist in the dataframe
+  if(!(all(c("DRG Definition", payment_type) %in% names(df)))){
+    stop("Dataframe must contain 'DRG Definition' and the specified payment_type columns")
+  }
+  
+  # Create boxplot with ggplot2
+  ggplot(df, aes(x = .data[["DRG Definition"]], y = .data[[payment_type]])) +
+    geom_boxplot(fill = color) +
+    labs(title = paste("Boxplot of", payment_type, "by DRG Code"),
+         x = "DRG Code",
+         y = payment_type) +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 2))  # This rotates the x-axis labels and adjusts their size
+}
+
+# Print the plot
+ggplot_boxplot_payments(df, "Average Medicare Payments", "red")
+
+```
+
+```{r}
+calculate_payment_stat <- function(df, type = c("mean", "median", "sd")) {
+  names(df) <- gsub(" ", "_", names(df))
+  # Select the statistic the user wants
+  type <- match.arg(type)
+  
+  # Calculate based on the selected type
+  if (type == "mean") {
+    stat <- mean(df$r, na.rm = TRUE)
+  } else if (type == "median") {
+    stat <- median(df$Average_Medicare_Payments, na.rm = TRUE)
+  } else {
+    stat <- sd(df$Average_Medicare_Payments, na.rm = TRUE)
+  } 
+  
+  return(stat)
+}
+```
+
+```{r}
+# Test
+calculate_payment_stat(df, "sd")
+```
